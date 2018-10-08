@@ -1,0 +1,77 @@
+<% layout('layout/page') -%>
+<% block('title', 'FlamePoker'); %>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const ROOM_NAME = {
+        cash: `Кэш столы`,
+        tournament: `Турнирные столы`
+    };
+    const socketGame = io.connect(`/game`);
+
+    socketGame.on(`info`, (data) => {
+        socketGame.playerName = data.name;
+    })
+
+    socketGame.on(`rooms`, (data)=>{
+        console.log(socketGame);
+        const container = document.getElementsByClassName(`rooms`)[0];
+        for( const name in data) {
+            const h2 = document.createElement(`h3`);
+            h2.textContent = ROOM_NAME[name];
+            const ul = document.createElement(`ul`);
+            const rooms = data[name];
+            for(let i=0; i<rooms.length; i++ ) {
+                const room = rooms[i];
+                const li = document.createElement(`li`);
+                li.id = room.id;
+                li.textContent = `${room.id}    ${room.seatsTaken}/${room.options.numSeats}  `;
+                if (name === `tournament`) {
+                    li.textContent += `buy-in: ${room.options.buyIn}    `;
+                    const button = document.createElement(`button`);
+                    const inRoom = room.players.indexOf(socketGame.playerName);
+                    if (~inRoom) {
+                        button.textContent = `Выйти`;
+                        button.onclick = (e) => {
+                            socketGame.emit(`action`, {room: e.target.parentNode.id, action: `unregister`});
+                        }
+                    } else {
+                        button.textContent = `Войти`;
+                        button.onclick = (e) => {
+                            socketGame.emit(`action`, {room: e.target.parentNode.id, action: `register`});
+                        }
+                    }
+                    li.append(button);
+                }
+                ul.append(li);
+            }
+
+            container.append(h2, ul);
+        }
+
+    })
+
+    socketGame.on(`room-changed`, (room) => {
+
+        const li = document.getElementById(room.id);
+        li.textContent = `${room.id}    ${room.seatsTaken}/${room.options.numSeats}   `;
+
+        if (room.id[0] === `2`) li.textContent += `buy-in: ${room.options.buyIn}    `;
+
+        const button = document.createElement(`button`);
+        const inRoom = room.players.indexOf(socketGame.playerName);
+        if (~inRoom) {
+            button.textContent = `Выйти`;
+            button.onclick = (e)=>{
+                socketGame.emit(`action`, {room:e.target.parentNode.id, action: `unregister`});
+            }
+        } else {
+            button.textContent = `Войти`;
+            button.onclick = (e) => {
+                socketGame.emit(`action`, {room: e.target.parentNode.id, action: `register`});
+            }
+        }
+        li.append(button);
+    })
+
+</script>
+<div class="rooms"></div>

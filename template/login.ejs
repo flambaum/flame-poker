@@ -1,0 +1,21 @@
+<% layout('layout/page') -%>
+<% block('title', 'Вход'); -%>
+<form action="/login" method="POST">
+    <table>
+        <tr>
+            <td>Кто</td>
+            <td>
+                <input name="username" type="text">
+            </td>
+        </tr>
+        <tr>
+            <td>Пароль</td>
+            <td>
+                <input name="password" type="password">
+            </td>
+        </tr>
+    </table>
+    <input type="button" onclick="submit()" value="Войти">
+    <p>или</p>
+    <a href="/registration">Зарегистрироваться</a>
+</form>

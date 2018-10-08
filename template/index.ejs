@@ -1,0 +1,4 @@
+<% layout('layout/page') -%>
+<% block('title', 'FlamePoker'); -%>
+
+<p>Привет, <% if (user) { %> <%- user.get(`username`)%> <% } else { %> залогинься! <% } %></p>
