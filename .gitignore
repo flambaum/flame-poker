@@ -1,0 +1,14 @@
+# Dependency directory
+node_modules
+
+# Logs
+*.log
+
+# WebStorm
+.idea/
+
+# DB
+db/
+
+# Other
+.babelrc
