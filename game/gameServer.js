@@ -19,6 +19,7 @@ class GameServer {
         this.roomsCount = 0;
         this.players = {};
         this.playersCount = 0;
+
     }
 
     start(options) {
@@ -28,7 +29,21 @@ class GameServer {
                 this.addRoom(type, rooms[type].options);
             }
         }
+
+        this.interval = setInterval(this.timeControl, 5000);
+
         return this;
+    }
+
+    timeControl() {
+
+        for (const room in this.tournamentRooms) {
+            if (room.state === 0 && room.options.startTime < Date.now()) {
+                console.log(`++++++ TIME +++++`)
+                room.startTournament();
+            }
+        }
+
     }
 
     addRoom(type, options) {
