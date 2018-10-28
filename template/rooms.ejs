@@ -73,5 +73,17 @@
         li.append(button);
     })
 
+    socketGame.on(`deal-cards`, (data) => {
+        console.log(data);
+    })
+
+    socketGame.on(`public-cards`, (data) => {
+        console.log(data);
+    })
+
+    socketGame.on(`err`,(d)=>{console.log(d)})
+
+    socketGame.on(`expected-action`,(d)=>{console.log(d)})
+
 </script>
 <div class="rooms"></div>

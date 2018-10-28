@@ -17,3 +17,5 @@ class Poker {
         return shuffled;
     }
 }
+
+module.exports = Poker;

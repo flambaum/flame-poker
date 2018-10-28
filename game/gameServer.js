@@ -30,16 +30,18 @@ class GameServer {
             }
         }
 
-        this.interval = setInterval(this.timeControl, 5000);
+        this.interval = setInterval(this.timeControl.bind(this), 5000);
 
         return this;
     }
 
     timeControl() {
 
-        for (const room in this.tournamentRooms) {
+        for (const roomId in this.tournamentRooms) {
+            const room = this.tournamentRooms[roomId];
+            console.log(room.options.startTime, Date.now());
             if (room.state === 0 && room.options.startTime < Date.now()) {
-                console.log(`++++++ TIME +++++`)
+                console.log(`++++++ TIME +++++`);
                 room.startTournament();
             }
         }
