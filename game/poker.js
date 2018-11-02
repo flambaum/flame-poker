@@ -6,6 +6,19 @@ RANK.forEach((r, i) => {
     COST[r] = i;
 });
 
+const COMBS = {
+    ROYAL_FLUSH: 9,
+    STRAIGHT_FLUSH: 8,
+    FOUR: 7,
+    FULL_HOUSE: 6,
+    FLUSH: 5,
+    STRAIGHT: 4,
+    SET: 3,
+    TWO_PAIR: 2,
+    PAIR: 1,
+    HIGH_CARD: 0
+};
+
 class Poker {
     static getDeck() {
         const deck = [];
@@ -29,8 +42,13 @@ class Poker {
     }
 
     static findBestCombination (cards) {
+        // cards : массив строк из двух символов (1. ранг карты, 2. масть карты)
+
         this.sort(cards);
+
         console.log(cards);
+
+        // Преобразуем массив карт (строк) в массив цен (объектов), заменяя ранг карты но стоимость ранга.
         const costs = cards.map((card) => {
             return {
                 cost: COST[card[0]],
@@ -38,94 +56,145 @@ class Poker {
             }
         });
 
-        let ROYAL_FLUSH = false,
-            STRAIGHT_FLUSH = false,
-            FLUSH = false,
-            STRAIGHT = false,
-            straightLen = 0,
-            straightTop = null,
-            straightFlushSuit = null,
-            straightFlushLen = 0,
-            suits = {s:0, h:0, d:0, c:0},
+        let FLUSH = null,
+            SET = null,
+            suits = {s:[], h:[], d:[], c:[]},
             repetitions = {},
-            searchDone = false;
+            noRepArr = [];
+
+        function searchStraight(cards) {
+            for (let i = 0; i <= cards.length - 5; i++) {
+                if (cards[i].cost - cards[i+4].cost === 4) {
+                    return i;
+                }
+            }
+            if (cards[0].cost === COST[`A`]) {
+                for (let i = 1; i <= cards.length - 4; i++) {
+                    if (cards[i].cost === COST[`5`] && cards[i].cost - cards[i+3].cost === 3) {
+                        return i;
+                    }
+                }
+            }
+            return -1;
+        }
 
         for (let i = 0; i < costs.length; i++) {
             const card = costs[i];
 
-            suits[card.suit] ++;
+            suits[card.suit].push(card);
+
+            if (noRepArr.length === 0 || noRepArr[noRepArr.length-1].cost !== card.cost) {
+                noRepArr.push(card);
+            }
 
             let rep = repetitions[card.cost];
             repetitions[card.cost] = rep ? ++rep : 1;
-
-            let nextCard = costs[i+1];
-            if (i !== costs.length - 1 && !searchDone) {
-                if (card.cost - nextCard.cost === 1 ) {
-                    if (!straightTop) {
-                        straightLen = 1;
-                        straightTop = RANK[card.cost];
-                        straightFlushSuit = card.suit;
-                        straightFlushLen = 1;
-                    }
-                    straightLen++;
-                    if (card.suit === nextCard.suit) straightFlushLen++;
-                } else if (card.cost - nextCard.cost !== 0) {
-                    if (straightLen >= 4) {
-                        searchDone = true;
-                    } else {
-                        straightTop = null;
-                    }
-                }
-            }
-        }
-
-        if (straightLen >= 5 || straightTop === `5` && costs[0].cost === COST[`A`]) {
-            STRAIGHT = true;
-
-            if (straightFlushLen >= 5) {
-
-                if (straightTop === `A`) {
-                    //Bingo!!
-                    ROYAL_FLUSH = true;
-                } else {
-                    STRAIGHT_FLUSH = true;
-                }
-
-            } else {
-                let i = 0;
-                while (costs[i].cost === COST[`A`]) {
-                    if (costs[i].suit === straightFlushSuit) {
-                        STRAIGHT_FLUSH = true;
-                        break;
-                    }
-                    i++;
-                }
-            }
         }
 
         for (const s in suits) {
-            if (suits[s] >= 5) FLUSH = true;
+            const cards = suits[s];
+            if (cards.length >= 5) {
+                const straight = searchStraight(cards);
+                if (~straight) {
+                    if (cards[straight].cost === COST[`A`]) {
+                        return {comb: COMBS.ROYAL_FLUSH}
+                    } else {
+                        return {
+                            comb: COMBS.STRAIGHT_FLUSH,
+                            cardCosts: [cards[straight].cost]
+                        };
+                    }
+                }
+
+                const cardCosts = cards.slice(0, 5).map((card) => {
+                    return card.cost;
+                });
+                // Запоминаем флеш, сначала проверяем каре и фулхаус
+                FLUSH =  {
+                    comb: COMBS.FLUSH,
+                    cardCosts: cardCosts
+                }
+            }
         }
 
+        const repArr = [];
+        for (const cost in repetitions) {
+            repArr.push({cost: +cost, n: repetitions[cost]});
+        }
 
-        console.log(`suits `, suits);
-        console.log(`rep `, repetitions);
-        console.log(`strL `, straightLen);
-        console.log(`strT `, straightTop);
-        console.log(`RF `, ROYAL_FLUSH);
-        console.log(`SF `, STRAIGHT_FLUSH);
-        console.log(`FL `, FLUSH);
-        console.log(`ST `, STRAIGHT);
-        return costs;
+        repArr.sort((r1, r2) => {
+            const diff = r2.n - r1.n;
+            return diff !== 0 ? diff : r2.cost - r1.cost;
+        });
+
+        if (repArr[0].n === 4) {
+            return {
+                comb: COMBS.FOUR,
+                cardCosts: [repArr[0].cost],
+                kickers: [repArr[1].cost > repArr[2].cost ? repArr[1].cost : repArr[2].cost]
+            }
+        }
+
+        if (repArr[0].n === 3) {
+            if (repArr[1].n >= 2){
+                return {
+                    comb: COMBS.FULL_HOUSE,
+                    cardCosts: [repArr[0].cost, repArr[1].cost]
+                }
+            }
+
+            SET = {
+                comb: COMBS.SET,
+                cardCosts: [repArr[0].cost],
+                kickers: [repArr[1].cost, repArr[2].cost]
+            }
+        }
+
+        if (FLUSH) return FLUSH;
+
+        const straight = searchStraight(noRepArr);
+        if (~straight) return {
+            comb: COMBS.STRAIGHT,
+            cardCosts: [costs[straight].cost]
+        };
+
+        if (SET) return SET;
+
+        if (repArr[0].n === 2) {
+            if (repArr[1].n === 2) {
+                return {
+                    comb: COMBS.TWO_PAIR,
+                    cardCosts: [repArr[0].cost, repArr[1].cost],
+                    kickers: [repArr[2].cost > repArr[3].cost ? repArr[2].cost : repArr[3].cost]
+                }
+            }
+            return {
+                comb: COMBS.PAIR,
+                cardCosts: [repArr[0].cost],
+                kickers: [repArr[1].cost, repArr[2].cost, repArr[3].cost]
+            }
+        }
+
+        const cardCosts = costs.slice(0,5).map((card) => {
+            return card.cost;
+        });
+        return {
+            comb: COMBS.HIGH_CARD,
+            cardCosts: [cardCosts[0]],
+            kickers: cardCosts.slice(1)
+        }
     }
-
 }
 
-// const a = Poker.getDeck().slice(0, 7);
+//const a = Poker.getDeck().slice(0, 7);
 
-let a = [`3h`,`5h`,`7c`,`6h`,`2h`,`Jc`,`4h`];
-
+let a = [`3h`,`3s`,`Ah`,`3c`,`2h`,`3d`,`4h`];
+//let a = [`Th`,`3h`,`2h`,`3c`,`Ah`,`Ac`,`3h`];
 console.log(a);
-console.log(Poker.findBestCombination(a));
+const res = Poker.findBestCombination(a);
+for (c in COMBS) if (COMBS[c] === res.comb) console.log(c);
 
+console.log(`cardCosts: `, res.cardCosts ? res.cardCosts.map(c=>RANK[c]): null);
+
+console.log(`kickers: `, res.kickers ? res.kickers.map(c=>RANK[c]): null);
 module.exports = Poker;
