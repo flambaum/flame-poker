@@ -41,6 +41,45 @@ class Poker {
         });
     }
 
+    static compareCombinations (comb1, comb2) {
+        // Функция возвращает 1 - если первая комбинация сильнее, -1 - если вторая,
+        // и 0 - если комбинации равноценны.
+
+        if (comb1.comb > comb2.comb) {
+            return 1;
+        } else if (comb2.comb > comb1.comb) {
+            return -1;
+        }
+
+        if (!comb1.cardCosts) return 0;
+
+        const costs1 = comb1.cardCosts,
+            costs2 = comb2.cardCosts;
+
+        for (let i = 0; i < costs1.length; i++) {
+            if (costs1[i] > costs2[i]) {
+                return 1;
+            } else if (costs2[i] > costs1[i]) {
+                return -1;
+            }
+        }
+
+        if (!comb1.kickers) return 0;
+
+        const kickers1 = comb1.kickers,
+            kickers2 = comb2.kickers;
+
+        for (let i = 0; i < kickers1.length; i++) {
+            if (kickers1[i] > kickers2[i]) {
+                return 1;
+            } else if (kickers2[i] > kickers1[i]) {
+                return -1;
+            }
+        }
+
+        return 0;
+    }
+
     static findBestCombination (cards) {
         // cards : массив строк из двух символов (1. ранг карты, 2. масть карты)
 
@@ -186,9 +225,9 @@ class Poker {
     }
 }
 
-//const a = Poker.getDeck().slice(0, 7);
+const a = Poker.getDeck().slice(0, 7);
 
-let a = [`3h`,`3s`,`Ah`,`3c`,`2h`,`3d`,`4h`];
+//let a = [`3h`,`3s`,`Ah`,`3c`,`2h`,`3d`,`4h`];
 //let a = [`Th`,`3h`,`2h`,`3c`,`Ah`,`Ac`,`3h`];
 console.log(a);
 const res = Poker.findBestCombination(a);
