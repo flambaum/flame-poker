@@ -4,7 +4,7 @@ module.exports = new class MessageCenter {
     setupSocket(io) {
         if (this.gameIO) return;
 
-        const gameIO = io
+        this.gameIO = io
             .of(`/game`)
             .on(`connection`, (socket) => {
                 gameServer.newPlayer(socket);
@@ -18,6 +18,7 @@ module.exports = new class MessageCenter {
                 });
 
                 socket.on(`action`, (data)=>{
+                    if (!data) return;
                     gameServer.action(socket, data);
                 });
 
@@ -31,7 +32,7 @@ module.exports = new class MessageCenter {
                 // })
             });
 
-        this.gameIO = gameIO;
+        // this.gameIO = gameIO;
         this.notifyAll.bind(this);
     }
 

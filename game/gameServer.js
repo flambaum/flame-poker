@@ -56,7 +56,10 @@ class GameServer {
     }
 
     newPlayer(socket) {
-        if (socket.userId in this.players) return;
+        if (socket.userId in this.players) {
+            this.players[socket.userId].socket = socket;
+            return;
+        }
 
         const player = new Player(socket);
         this.players[player.id] = player;
@@ -78,6 +81,8 @@ class GameServer {
     }
 
     action(socket, data) {
+        console.log(`ACTION data=`, data);
+
         const typeRoom = KEYS_ROOM[ String(data.room)[0] ];
         const room = this[`${typeRoom}Rooms`][data.room];
 
@@ -90,8 +95,6 @@ class GameServer {
             const player = this.players[socket.userId];
             func.call(room, player, data.options);
         }
-
-        // console.log(this);
     }
 
     notify() {

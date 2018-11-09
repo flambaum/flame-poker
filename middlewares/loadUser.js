@@ -4,7 +4,7 @@ module.exports = (req, res, next) => {
     if (!req.session.userId) {
         res.locals.user = null;
         return next();
-    };
+    }
 
     User.findById(req.session.userId, (err, user) => {
         if (err) return next(err);
