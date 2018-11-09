@@ -229,7 +229,7 @@ class tRoom extends Room{
         });
 
         candidates.sort((player1, player2) => {
-            return Poker.compareCombinations(player1.comb, player2.comb);
+            return Poker.compareCombinations(player2.comb, player1.comb);
         });
 
         for (let i = 1, index = 0; i < candidates.length; i++) {
