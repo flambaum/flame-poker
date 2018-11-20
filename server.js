@@ -1,5 +1,7 @@
-const http = require('http');
+const messageCenter = require(`./game/messageCenter`);
+const gameServer = require(`./game/gameServer`);
 
+const http = require('http');
 const app = require(`./app`);
 const config = require(`./config`);
 
@@ -8,9 +10,6 @@ const server = http.createServer(app);
 
 const io = require(`./socket`)(server);
 app.set(`io`, io);
-
-const messageCenter = require(`./game/messageCenter`);
-const gameServer = require(`./game/gameServer`);
 
 gameServer.start(config.get(`gameServerOptions`));
 messageCenter.setupSocket(io);

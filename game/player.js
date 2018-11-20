@@ -1,12 +1,14 @@
 const UserMoney = require(`../models/userMoney`);
 
 class Player {
-    constructor(socket) {
-        const data = socket.handshake.session;
-        this.name = data.username;
-        this.socket = socket;
-        this.id = data.userId;
-
+    constructor(id, name) {
+        this.name = name;
+        this.sockets = {
+            lobby: null,
+            game: {},
+            chat: {}
+        };
+        this.id = id;
     }
 
     get money() {

@@ -1,5 +1,6 @@
 const Room = require(`./room`);
 const Poker = require(`./poker`);
+const messageCenter = require(`./messageCenter`);
 
 const STATE = {
     wait: 0,
@@ -19,7 +20,7 @@ const ROUND_STAGE = {
 class tRoom extends Room{
     constructor(id, options) {
         super(id, options);
-        this.options.startTime = Date.now() + 120000;
+        this.options.startTime = Date.now() + 60000;
 
         this.state = STATE.wait;
         this.players = {};
@@ -48,6 +49,30 @@ class tRoom extends Room{
         return result;
     }
 
+    getRoomState() {
+        let result = {
+            currentPlayer: this.currentPlayer,
+            roundStage: this.roundStage,
+            button: this.button,
+            board: this.board,
+            pots: this.pots,
+            bet: this.bet,
+            seats: {}
+        };
+
+        for (const i in this.seats) {
+            const seat = this.seats[i];
+            result.seats[i] = {
+                bet: seat.bet,
+                stack: seat.stack,
+                allIn: seat.allIn,
+                inGame: seat.inGame,
+                seatOut: seat.seatOut
+            };
+        }
+        return result;
+    }
+
     async _register(player) {
         if (this.isFull) return;
 
@@ -63,7 +88,6 @@ class tRoom extends Room{
             if (this.seatsTaken === this.options.numSeats) this.isFull = true;
 
             player.money = balance;
-            player.socket.join(this.id);
 
             super.notifyAll(`room-changed`, this.getRoom(true));
         }
@@ -76,8 +100,6 @@ class tRoom extends Room{
         this.seatsTaken -= 1;
         this.isFull = false;
         delete this.players[player.name];
-
-        player.socket.leave(this.id);
 
         let balans = await player.money;
         balans += this.options.buyIn;
@@ -132,6 +154,8 @@ class tRoom extends Room{
         this.playerBet(sb, this.bigBlind / 2);
         this.playerBet(bb, this.bigBlind);
 
+        messageCenter.notifyRoom(this.id, `new-round`, this.getRoomState());
+
         this.deck = Poker.getDeck();
         this.dealCards();
 
@@ -139,6 +163,8 @@ class tRoom extends Room{
             this.roundStage = state;
 
             this.dealPublicCards(state);
+
+            messageCenter.notifyRoom(this.id, `new-street`, this.getRoomState());
 
             // Если все в оллине ставим задержку и пропускаем круг торгов.
             if (this.numPlayersInGame - this.allInCount < 2) {
@@ -196,7 +222,8 @@ class tRoom extends Room{
     * bettingRound() {
         while (true) {
             const seat = this.seats[this.currentPlayer];
-            seat.player.socket.emit(`expected-action`, {
+            const socket = seat.player.sockets.game[this.id];
+            socket.emit(`expected-action`, {
                 m: `Ваше слово?`,
                 stack: seat.stack,
                 bet: seat.bet,
@@ -296,48 +323,9 @@ class tRoom extends Room{
         });
     }
 
-    // findingWinner() {
-    //     if (this.roundStage === ROUND_STAGE.earlyWin) {
-    //         const index = this.seats.findIndex((seat) => {
-    //             return seat.inGame;
-    //             // if (seat.inGame) {
-    //             //     seat.stack += this.pot;
-    //             //     return true;
-    //             // }
-    //         });
-    //
-    //         return [{i:[index], comb: null}];
-    //     }
-    //
-    //     const playersComb = [];
-    //     this.seats.forEach((seat, i) => {
-    //         if (seat.inGame) {
-    //             const cards = seat.hand.concat(this.board);
-    //             const comb = Poker.findBestCombination(cards);
-    //             playersComb.push({i:[i], comb});
-    //         }
-    //     });
-    //
-    //     playersComb.sort((player1, player2) => {
-    //         return Poker.compareCombinations(player1.comb, player2.comb);
-    //     });
-    //
-    //     for (let i = 1, index = 0; i < playersComb.length; i++) {
-    //         const pl1 = playersComb[index],
-    //             pl2 = playersComb[index+1];
-    //         if (Poker.compareCombinations(pl1.comb, pl2.comb) === 0) {
-    //             pl1.i.concat(pl2.i);
-    //             playersComb.splice(index+1, 1);
-    //         } else {
-    //             index++;
-    //         }
-    //     }
-    //
-    // return playersComb;
-    // }
-
     resetTable(deep = false) {
         if (deep) {
+            this.roundStage = 0;
             this.numPlayersInGame = 0;
             this.allInCount = 0;
             this.pot = 0;
@@ -449,7 +437,8 @@ class tRoom extends Room{
         }
 
         this.seats.forEach((seat) => {
-            seat.player.socket.emit(`deal-cards`, {hand: seat.inGame ? seat.hand : null});
+            const socket = seat.player.sockets.game[this.id];
+            socket.emit(`deal-cards`, {hand: seat.inGame ? seat.hand : null});
         })
     }
 
@@ -465,10 +454,10 @@ class tRoom extends Room{
         this.deck.pop();
         this.board.push(...this.deck.splice(-n,n));
 
-        this.seats.forEach((seat) => {
-            seat.player.socket.emit(`public-cards`, {board: this.board});
-        })
+        messageCenter.notifyRoom(this.id, `public-cards`, {board: this.board});
     }
+
+
 
     timeOut() {
         const seat = this.seats[this.currentPlayer];
@@ -495,7 +484,8 @@ class tRoom extends Room{
         const seat = this.seats[this.currentPlayer];
 
         if (seat.player !== player) {
-            player.socket.emit(`err`, `Не твой ход`);
+            const socket = seat.player.sockets.game[this.id];
+            socket.emit(`err`, `Не твой ход`);
             return;
         }
 
@@ -515,19 +505,32 @@ class tRoom extends Room{
                 break;
 
             case `bet`:
-                if (data.bet > this.bet) {
-                    this.playerBet(seat, data.bet);
+                const bet = Number(data.bet);
+                if (bet > this.bet) {
+                    this.playerBet(seat, bet);
                 }
                 break;
 
             default:
-                player.socket.emit(`err`, `Неверное действие!`);
+                const socket = seat.player.sockets.game[this.id];
+                socket.emit(`err`, `Неверное действие!`);
                 return;
         }
 
         // Добавить обработку ошибок и неверных действий до этого момента.
         clearTimeout(this.actionTimer);
         seat.isActed = true;
+
+        let newData = {
+            word: data.word,
+            bet: data.bet,
+            player: {
+                seat: this.currentPlayer,
+                id: player.id,
+                name: player.name
+            }
+        };
+        messageCenter.notifyRoom(this.id, `player-acted`, newData, player);
 
         this.roundGenerator.next();
     }

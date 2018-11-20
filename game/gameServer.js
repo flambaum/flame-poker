@@ -41,7 +41,7 @@ class GameServer {
             const room = this.tournamentRooms[roomId];
             console.log(room.options.startTime, Date.now());
             if (room.state === 0 && room.options.startTime < Date.now()) {
-                console.log(`++++++ TIME +++++`);
+                console.log(`++++++ Tournament START +++++`);
                 room.startTournament();
             }
         }
@@ -55,15 +55,14 @@ class GameServer {
         this[`${type}Rooms`][id] = room;
     }
 
-    newPlayer(socket) {
-        if (socket.userId in this.players) {
-            this.players[socket.userId].socket = socket;
-            return;
+    newPlayer(id, name) {
+        if (id in this.players) {
+            return this.players[id];
         }
-
-        const player = new Player(socket);
-        this.players[player.id] = player;
+        const player = new Player(id, name);
+        this.players[id] = player;
         this.playersCount ++;
+        return player;
     }
 
     getRooms() {
@@ -80,7 +79,16 @@ class GameServer {
         return rooms;
     }
 
-    action(socket, data) {
+    getRoom(id) {
+        const type = KEYS_ROOM[String(id)[0]];
+        return this[`${type}Rooms`][id];
+    }
+
+    getPlayer(id) {
+        return this.players[id];
+    }
+
+    action(userID, data) {
         console.log(`ACTION data=`, data);
 
         const typeRoom = KEYS_ROOM[ String(data.room)[0] ];
@@ -92,7 +100,7 @@ class GameServer {
         const func = room[`_${act}`];
 
         if (typeof func === `function`) {
-            const player = this.players[socket.userId];
+            const player = this.players[userID];
             func.call(room, player, data.options);
         }
     }
