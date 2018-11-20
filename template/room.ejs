@@ -1,0 +1,27 @@
+<% layout('layout/page') -%>
+<% block('title', 'FlamePoker'); %>
+<script src="/socket.io/socket.io.js"></script>
+
+
+<div class="table">
+    <div class="board"></div>
+    <div class="player">
+        <div class="hand"></div>
+        <p class="stack">
+            Стек: <span class="stack-value"></span>
+        </p>
+    </div>
+</div>
+<div class="control" style="display:none;">
+    <p class="">
+        Ставка:
+        <input type="text" size="20" class="bet_value">
+    </p>
+    <button class="fold">fold</button>
+    <button class="check">check</button>
+    <button class="call">call</button>
+    <button class="bet">bet</button>
+</div>
+
+<script src="/js/poker.min.js"></script>
+<script src="/js/room.js"></script>
