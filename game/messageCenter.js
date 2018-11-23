@@ -4,7 +4,7 @@ module.exports = new class MessageCenter {
     }
 
     setupSocket(io) {
-        if (this.gameIO) return;
+        if (this.lobbyIO) return;
 
         this.lobbyIO = io.of(`/lobby`)
             .on(`connection`, (socket) => {
@@ -75,8 +75,10 @@ module.exports = new class MessageCenter {
         socket.emit(event, data);
     }
 
-
-
+    notifyPlayer(player, roomID, event, data) {
+        const socket = player.sockets.game[roomID];
+        socket.emit(event, data);
+    }
 };
 
 const gameServer = require(`./gameServer`);

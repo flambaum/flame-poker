@@ -130,6 +130,10 @@ class tRoom extends Room{
         this.button = 0;
         this.bigBlind = this.options.structure[1];
 
+        let info = this.getRoomState();
+        info.options = this.options;
+        messageCenter.notifyRoom(this.id, `tournament-start`, info);
+
         this.roundGenerator = this.round();
         this.roundGenerator.next();
     }
@@ -221,15 +225,9 @@ class tRoom extends Room{
 
     * bettingRound() {
         while (true) {
-            const seat = this.seats[this.currentPlayer];
-            const socket = seat.player.sockets.game[this.id];
-            socket.emit(`expected-action`, {
-                m: `Ваше слово?`,
-                stack: seat.stack,
-                bet: seat.bet,
-                pots: this.pots,
-            });
-            this.actionTimer = setTimeout(this.timeOut.bind(this), 300*1000);
+            this.requestAction();
+
+            this.actionTimer = setTimeout(this.timeOut.bind(this), 60*1000);
 
             console.log(`+++запрос ставки, таймер пошел`);
 
@@ -242,6 +240,34 @@ class tRoom extends Room{
             console.log(this);
 
         }
+    }
+
+    requestAction() {
+        const seat = this.seats[this.currentPlayer];
+        const data = {
+            stack: seat.stack,
+            bet: seat.bet,
+            pots: this.pots,
+            tableBet: this.bet,
+            actions: {
+                fold: true,
+                check: false,
+                call: false,
+                bet: false,
+                allIn: true
+            }
+        };
+
+        const act = data.actions;
+        if (this.bet === seat.bet) {
+            act.check = true;
+            act.bet = true;
+        } else if (seat.stack > this.bet - seat.bet) {
+            act.call = true;
+            act.bet = true;
+        }
+
+        messageCenter.notifyPlayer(seat.player, this.id, `expected-action`, data);
     }
 
     findingWinner(players) {
@@ -282,15 +308,45 @@ class tRoom extends Room{
             });
 
             allInPlrs.forEach((seat) => {
-                this.moveChipsToPot(seat.bet, false);
-                this.bet -= seat.bet;
+                const chipsToMove = seat.bet;
+                this.moveChipsToPot(chipsToMove, false);
+                this.bet -= chipsToMove;
             });
         }
 
         this.moveChipsToPot(this.bet, true);
     }
 
+    moveChipsToPot(bet, open) {
+        if (bet <= 0) return;
+
+        let pot = this.pots[this.pots.length - 1];
+        if (!pot.open) {
+            pot = {
+                plrs:{},
+                bet: 0,
+                chips: 0,
+                open: true,
+                winners: null,
+                comb: null
+            };
+            this.pots.push(pot);
+        }
+        pot.bet += bet;
+        pot.open = open;
+
+        this.seats.forEach((seat,i) => {
+            if (seat.bet) {
+                const chips = seat.bet > bet ? bet : seat.bet;
+                pot.chips += chips;
+                pot.plrs[i] = true;
+                seat.bet -= chips;
+            }
+        });
+    }
+
     rewardWinner() {
+        console.log(`POTS`, this.pots);
         this.pots.forEach((pot, potNum) => {
             const players = Object.keys(pot.plrs).filter((i) => {
                 return this.seats[i].inGame;
@@ -317,6 +373,7 @@ class tRoom extends Room{
                 }
 
             } else {
+                console.log(`POT`, pot);
                 const seat = this.seats[pot.winners[0]];
                 seat.stack += pot.chips;
             }
@@ -401,34 +458,6 @@ class tRoom extends Room{
         this.pot += chips;
     }
 
-    moveChipsToPot(bet, open) {
-        if (bet <= 0) return;
-
-        let pot = this.pots[this.pots.length - 1];
-        if (!pot.open) {
-            pot = {
-                plrs:{},
-                bet: 0,
-                chips: 0,
-                open: true,
-                winners: null,
-                comb: null
-            };
-            this.pots.push(pot);
-        }
-        pot.bet += bet;
-        pot.open = open;
-
-        this.seats.forEach((seat,i) => {
-            if (seat.bet) {
-                const chips = seat.bet > bet ? bet : seat.bet;
-                pot.chips += chips;
-                pot.plrs[i] = true;
-                seat.bet -= chips;
-            }
-        });
-    }
-
     dealCards() {
         for (let i = 0; i <= 1; i++) {
             this.seats.forEach((seat) => {
@@ -437,8 +466,7 @@ class tRoom extends Room{
         }
 
         this.seats.forEach((seat) => {
-            const socket = seat.player.sockets.game[this.id];
-            socket.emit(`deal-cards`, {hand: seat.inGame ? seat.hand : null});
+            messageCenter.notifyPlayer(seat.player, this.id, `deal-cards`, {hand: seat.inGame ? seat.hand : null});
         })
     }
 
@@ -456,8 +484,6 @@ class tRoom extends Room{
 
         messageCenter.notifyRoom(this.id, `public-cards`, {board: this.board});
     }
-
-
 
     timeOut() {
         const seat = this.seats[this.currentPlayer];
@@ -506,14 +532,14 @@ class tRoom extends Room{
 
             case `bet`:
                 const bet = Number(data.bet);
-                if (bet > this.bet) {
-                    this.playerBet(seat, bet);
-                }
+                if (bet < this.bet - seat.bet && bet < seat.stack) return;
+
+                this.playerBet(seat, bet);
+
                 break;
 
             default:
-                const socket = seat.player.sockets.game[this.id];
-                socket.emit(`err`, `Неверное действие!`);
+                messageCenter.notifyPlayer(seat.player, this.id, `err`, `Неверное действие!`);
                 return;
         }
 
@@ -521,9 +547,20 @@ class tRoom extends Room{
         clearTimeout(this.actionTimer);
         seat.isActed = true;
 
+        messageCenter.notifyPlayer(player, this.id, `action-completed`, {
+            stack: seat.stack,
+            bet: seat.bet,
+            inGame: seat.inGame,
+        });
+
         let newData = {
-            word: data.word,
-            bet: data.bet,
+            action: {
+                word: data.word,
+                bet: data.bet
+            },
+            stack: seat.stack,
+            bet: seat.bet,
+            inGame: seat.inGame,
             player: {
                 seat: this.currentPlayer,
                 id: player.id,

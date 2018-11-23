@@ -3,10 +3,27 @@ const roomID = location.pathname.split(`/`)[2];
 const table = document.querySelector(`.table`),
     control = document.querySelector(`.control`);
 
+const state = {
+    seats: []
+};
+
+let stack,
+hero;
+
+function setState(data) {
+    for (const prop in data) {
+        state[prop] = data[prop] || state[prop];
+    }
+}
+
 const gameSocket = io.connect(`/game`);
 
 gameSocket.on(`expected-roomID`, () => {
     gameSocket.emit(`roomID`, roomID);
+});
+
+gameSocket.on(`tournament-start`, (data) => {
+    setState(data);
 });
 
 gameSocket.on(`deal-cards`, (data) => {
@@ -19,6 +36,8 @@ gameSocket.on(`deal-cards`, (data) => {
 });
 
 gameSocket.on(`public-cards`, (data) => {
+    state.board = data.board;
+
     const board = table.querySelector(`.board`);
     board.innerHTML = ``;
     for (const i in data.board) {
@@ -30,25 +49,39 @@ gameSocket.on(`public-cards`, (data) => {
 gameSocket.on(`err`,(d)=>{console.log(d)});
 
 gameSocket.on(`expected-action`,(data)=>{
-    table.querySelector(`.stack-value`).textContent = data.stack;
-    control.style.display = "block";
+    state.stack = data.stack;
+
+    table.querySelector(`.stack-value`).textContent = stack;
+
+    control.querySelector(`.check`).hidden = !data.actions.check;
+    control.querySelector(`.call`).hidden = !data.actions.call;
+    control.querySelector(`.bet`).hidden = !data.actions.bet;
+
+    control.style.display = `block`;
 });
 
 gameSocket.on(`new-round`, (data) => {
-    console.log(`new-round`, data);
+    setState(data);
 });
 
 gameSocket.on(`new-street`, (data) => {
-    console.log(`new-street`, data);
+    setState(data);
 });
 
 gameSocket.on(`player-acted`, (data) => {
     console.log(`player-acted`, data);
+
+
+});
+
+gameSocket.on(`action-completed`, (data) => {
+
+
 });
 
 const actionResponse = {
     action: `action`,
-    room: roomID,
+    room: roomID
 };
 
 control.querySelector(`.fold`).addEventListener(`click`, (e) => {
@@ -56,7 +89,7 @@ control.querySelector(`.fold`).addEventListener(`click`, (e) => {
         word: `fold`
     };
     gameSocket.emit(`action`, actionResponse);
-    control.style.display = "none";
+    control.style.display = `none`;
 });
 
 control.querySelector(`.check`).addEventListener(`click`, (e) => {
@@ -64,7 +97,7 @@ control.querySelector(`.check`).addEventListener(`click`, (e) => {
         word: `check`
     };
     gameSocket.emit(`action`, actionResponse);
-    control.style.display = "none";
+    control.style.display = `none`;
 });
 
 control.querySelector(`.call`).addEventListener(`click`, (e) => {
@@ -72,7 +105,7 @@ control.querySelector(`.call`).addEventListener(`click`, (e) => {
         word: `call`
     };
     gameSocket.emit(`action`, actionResponse);
-    control.style.display = "none";
+    control.style.display = `none`;
 });
 
 control.querySelector(`.bet`).addEventListener(`click`, (e) => {
@@ -83,5 +116,14 @@ control.querySelector(`.bet`).addEventListener(`click`, (e) => {
         bet: betInput.value
     };
     gameSocket.emit(`action`, actionResponse);
-    control.style.display = "none";
+    control.style.display = `none`;
+});
+
+control.querySelector(`.allIn`).addEventListener(`click`, (e) => {
+    actionResponse.options = {
+        word: `bet`,
+        bet: stack
+    };
+    gameSocket.emit(`action`, actionResponse);
+    control.style.display = `none`;
 });
