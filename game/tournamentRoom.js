@@ -37,11 +37,11 @@ class tRoom extends Room{
         this.pot = 0;
         this.bet = 0;
         this.currentPlayer = null;
-        console.log(this);
     }
 
     getRoom(detailed = true) {
         const result = super.getRoom();
+        result.state = this.state;
 
         if (detailed) {
             result.players = Object.keys(this.players);
@@ -64,6 +64,7 @@ class tRoom extends Room{
             const seat = this.seats[i];
             result.seats[i] = {
                 bet: seat.bet,
+                name: seat.player.name,
                 stack: seat.stack,
                 allIn: seat.allIn,
                 inGame: seat.inGame,
@@ -148,7 +149,6 @@ class tRoom extends Room{
             sb = this.seats[this.button];
             bb = this.seats[(this.button + 1) % this.seatsTaken];
             this.setCurrentPlayer(this.button + 1);
-
         } else {
             sb = this.seats[(this.button + 1) % this.seatsTaken];
             bb = this.seats[(this.button + 2) % this.seatsTaken];
@@ -268,6 +268,7 @@ class tRoom extends Room{
         }
 
         messageCenter.notifyPlayer(seat.player, this.id, `expected-action`, data);
+        messageCenter.notifyRoom(this.id, `waiting-player-move`, {seat: this.currentPlayer}, seat.player);
     }
 
     findingWinner(players) {
@@ -411,8 +412,6 @@ class tRoom extends Room{
             }
             seat.isActed = false;
             seat.bet = 0;
-
-            console.log(`++resetTable `, seat);
         })
     }
 
@@ -510,8 +509,7 @@ class tRoom extends Room{
         const seat = this.seats[this.currentPlayer];
 
         if (seat.player !== player) {
-            const socket = seat.player.sockets.game[this.id];
-            socket.emit(`err`, `Не твой ход`);
+            messageCenter.notifyPlayer(player, this.id, `err`, `Не твой ход!`);
             return;
         }
 
@@ -570,6 +568,21 @@ class tRoom extends Room{
         messageCenter.notifyRoom(this.id, `player-acted`, newData, player);
 
         this.roundGenerator.next();
+
+        //return `ok`;
+    }
+
+    _getInfo(player, {type}) {
+        switch (type) {
+            case 'room-info':
+                const info = this.getRoom();
+                info.hero = {
+                    name: player.name,
+                };
+                return info;
+            default:
+                return new Error('Неверный запрос');
+        }
     }
 
 }

@@ -21,7 +21,7 @@
   "gameServerOptions": {
     "rooms": {
       "cash":{
-        "num": 3,
+        "num": 0,
         "options": {
 
         }
@@ -31,6 +31,7 @@
         "options": {
           "buyIn": 200,
           "runStack": 3000,
+          "numSeats": 9,
           "structure": {
             "1": 20,
             "2": 30,

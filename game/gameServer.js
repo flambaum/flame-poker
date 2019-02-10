@@ -80,7 +80,10 @@ class GameServer {
     }
 
     getRoom(id) {
-        const type = KEYS_ROOM[String(id)[0]];
+        id = String(id);
+        if (!id) return undefined;
+        const type = KEYS_ROOM[id[0]];
+        if (!type) return undefined;
         return this[`${type}Rooms`][id];
     }
 
@@ -88,20 +91,18 @@ class GameServer {
         return this.players[id];
     }
 
-    action(userID, data) {
-        console.log(`ACTION data=`, data);
+    messageHandler(userID, type, data) {
 
-        const typeRoom = KEYS_ROOM[ String(data.room)[0] ];
-        const room = this[`${typeRoom}Rooms`][data.room];
+        const room = this.getRoom(data.roomID);
 
         if (!room) return;
 
-        const act = data.action;
-        const func = room[`_${act}`];
+        const funcName = type || data.action;
+        const func = room[`_${funcName}`];
 
         if (typeof func === `function`) {
             const player = this.players[userID];
-            func.call(room, player, data.options);
+            return func.call(room, player, data.options || data);
         }
     }
 

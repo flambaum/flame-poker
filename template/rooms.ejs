@@ -6,6 +6,7 @@
         cash: `Кэш столы`,
         tournament: `Турнирные столы`
     };
+    const CRA_URL = `http://localhost:3001`;
     const lobbySocket = io.connect(`/lobby`);
 
     lobbySocket.on(`info`, (data) => {
@@ -25,7 +26,8 @@
                 const li = document.createElement(`li`);
                 li.id = room.id;
                 const a = document.createElement(`a`);
-                a.href = `/room/${room.id}`;
+                a.href = `${CRA_URL}/room/${room.id}`;
+                a.target = `_blank`;
                 a.textContent = `${room.id}    ${room.seatsTaken}/${room.options.numSeats}  `;
                 if (name === `tournament`) {
                     a.textContent += `buy-in: ${room.options.buyIn}    `;
@@ -35,12 +37,12 @@
                     if (~inRoom) {
                         button.textContent = `Выйти`;
                         button.onclick = (e) => {
-                            lobbySocket.emit(`action`, {room: e.target.parentNode.id, action: `unregister`});
+                            lobbySocket.emit(`action`, {roomID: e.target.parentNode.id, action: `unregister`});
                         }
                     } else {
                         button.textContent = `Войти`;
                         button.onclick = (e) => {
-                            lobbySocket.emit(`action`, {room: e.target.parentNode.id, action: `register`});
+                            lobbySocket.emit(`action`, {roomID: e.target.parentNode.id, action: `register`});
                         }
                     }
                     li.append(button);
@@ -59,7 +61,8 @@
 
         const a = document.createElement(`a`);
         a.textContent = `${room.id}    ${room.seatsTaken}/${room.options.numSeats}  `;
-        a.href = `/room/${room.id}`;
+        a.href = `${CRA_URL}/room/${room.id}`;
+        a.target = `_blank`;
         if (room.id[0] === `2`) a.textContent += `buy-in: ${room.options.buyIn}    `;
 
         const button = document.createElement(`button`);

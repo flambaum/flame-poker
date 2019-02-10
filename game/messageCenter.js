@@ -1,6 +1,13 @@
+const REQUEST_TYPE = {
+    'action': 'action',
+    'get-info': 'getInfo'
+};
+
 module.exports = new class MessageCenter {
     constructor(){
         this.lobbyIO = null;
+        this.gameIO = null;
+        this.chatIO = null;
     }
 
     setupSocket(io) {
@@ -21,35 +28,40 @@ module.exports = new class MessageCenter {
 
                 socket.on(`action`, (data)=>{
                     if (!data) return;
-                    gameServer.action(socket.userId, data);
+                    gameServer.messageHandler(socket.userId, null, data);
                 });
             });
 
         this.gameIO = io.of(`/game`)
             .on(`connection`, (socket) => {
-                socket.emit(`expected-roomID`);
+                const roomID = socket.handshake.query.roomID;
 
-                socket.on(`roomID`, (roomID) => {
-                    let player = gameServer.getPlayer(socket.userId);
-                    if (!player) {
-                        player = gameServer.newPlayer(socket.userId, socket.username);
-                    }
-                    player.sockets.game[roomID] = socket.join(String(roomID));
-                });
+                if (!roomID) {
+                    socket.disconnect();
+                    return;
+                }
+
+                let player = gameServer.getPlayer(socket.userId);
+                if (!player) {
+                    player = gameServer.newPlayer(socket.userId, socket.username);
+                }
+                socket.roomID = roomID;
+                player.sockets.game[roomID] = socket.join(String(roomID));
 
                 socket.on(`action`, (data)=>{
-                    if (!data) return;
-                    gameServer.action(socket.userId, data);
+                    if (!data || !socket.roomID) return;
+                    data.roomID = socket.roomID;
+                    const type = REQUEST_TYPE[`action`];
+                    gameServer.messageHandler(socket.userId, type, data);
                 });
 
-                // socket.on(`lobby-action`, (data)=>{
-                //     console.log(socket);
-                //     const act = data.action;
-                //     const func = gameServer[`_${act}`];
-                //     if (typeof func === `function`) {
-                //         func.call(gameServer, data.options);
-                //     }
-                // })
+                socket.on(`get-info`, (data, callback) => {
+                    if (!data || !socket.roomID) return;
+                    data.roomID = socket.roomID;
+                    const type = REQUEST_TYPE[`get-info`];
+                    const info = gameServer.messageHandler(socket.userId, type, data);
+                    callback(info);
+                })
             });
 
         this.chatIO = io.of(`/chat`)
@@ -72,12 +84,16 @@ module.exports = new class MessageCenter {
         } else {
             socket = this.gameIO.to(roomID);
         }
-        socket.emit(event, data);
+        if (socket) {
+            socket.emit(event, data);
+        }
     }
 
     notifyPlayer(player, roomID, event, data) {
         const socket = player.sockets.game[roomID];
-        socket.emit(event, data);
+        if (socket) {
+            socket.emit(event, data);
+        }
     }
 };
 

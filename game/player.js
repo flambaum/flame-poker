@@ -17,6 +17,11 @@ class Player {
         })();
     }
 
+    // async getMoney() {
+    //     const data = await UserMoney.findOne({ userId: this.id });
+    //     return data.money;
+    // }
+
     set money(m) {
         UserMoney.findOne({userId: this.id}, (err, userMoney) => {
             userMoney.money = m;

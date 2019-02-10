@@ -17,7 +17,11 @@ class Room {
     }
 
     getRoom() {
-        return {id: this.id, seatsTaken: this.seatsTaken, options: this.options};
+        return {
+            id: this.id,
+            seatsTaken: this.seatsTaken,
+            options: this.options,
+        };
     }
 
     notifyAll(event, data) {
