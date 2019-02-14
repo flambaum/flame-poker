@@ -20,7 +20,7 @@ const ROUND_STAGE = {
 class tRoom extends Room{
     constructor(id, options) {
         super(id, options);
-        this.options.startTime = Date.now() + 60000;
+        this.options.startTime = Date.now() + 120000;
 
         this.state = STATE.wait;
         this.players = {};
@@ -70,6 +70,15 @@ class tRoom extends Room{
                 inGame: seat.inGame,
                 seatOut: seat.seatOut
             };
+        }
+        return result;
+    }
+
+    getPlayersHands() {
+        let result = {};
+        for (const i in this.seats) {
+            const seat = this.seats[i];
+            if (seat.inGame) result[i] = seat.hand;
         }
         return result;
     }
@@ -172,6 +181,9 @@ class tRoom extends Room{
 
             // Если все в оллине ставим задержку и пропускаем круг торгов.
             if (this.numPlayersInGame - this.allInCount < 2) {
+
+                messageCenter.notifyRoom(this.id, 'all-in', this.getPlayersHands());
+
                 this.delay(3000);
                 yield;
                 continue;
@@ -198,7 +210,12 @@ class tRoom extends Room{
 
         }
 
-        this.rewardWinner();
+        const winnersInfo = this.rewardWinner();
+
+        messageCenter.notifyRoom(this.id, 'round-end', {
+            winners: winnersInfo,
+            hands: this.getPlayersHands(),
+        });
 
         this.button = (this.button + 1) % this.seatsTaken;
 
@@ -230,6 +247,7 @@ class tRoom extends Room{
             this.actionTimer = setTimeout(this.timeOut.bind(this), 60*1000);
 
             console.log(`+++запрос ставки, таймер пошел`);
+            console.log(this);
 
             yield;
 
@@ -267,18 +285,20 @@ class tRoom extends Room{
             act.bet = true;
         }
 
+        seat.actions = act;
+
         messageCenter.notifyPlayer(seat.player, this.id, `expected-action`, data);
         messageCenter.notifyRoom(this.id, `waiting-player-move`, {seat: this.currentPlayer}, seat.player);
     }
 
     findingWinner(players) {
         const candidates = [];
-        players.forEach((pl) => {
-            const seat = this.seats[pl];
+        players.forEach((player) => {
+            const seat = this.seats[player];
             if (seat.inGame) {
                 const cards = seat.hand.concat(this.board);
                 const comb = Poker.findBestCombination(cards);
-                candidates.push({players:[pl], comb});
+                candidates.push({players:[player], comb});
             }
         });
 
@@ -348,7 +368,14 @@ class tRoom extends Room{
 
     rewardWinner() {
         console.log(`POTS`, this.pots);
-        this.pots.forEach((pot, potNum) => {
+        const result = [];
+
+        this.pots.forEach((pot, potIndex) => {
+            result[potIndex] = {
+                pot: potIndex,
+                winners: []
+            };
+
             const players = Object.keys(pot.plrs).filter((i) => {
                 return this.seats[i].inGame;
             });
@@ -367,18 +394,32 @@ class tRoom extends Room{
                 const chips = Math.floor(pot.chips / winnersCount);
                 pot.winners.forEach((i) => {
                     this.seats[i].chips += chips;
+                    result[potIndex].winners.push({
+                        seat: i,
+                        chips: chips
+                    });
                 });
 
-                if (chips * winnersCount < pot.chips) {
-                    this.seats[pot.winners[0]].stack += pot.chips - chips * winnersCount;
+                const residue = pot.chips % winnersCount;
+
+                if (residue) {
+                    this.seats[pot.winners[0]].stack += residue;
+                    result[potIndex].winners[0].chips += residue;
                 }
 
             } else {
                 console.log(`POT`, pot);
                 const seat = this.seats[pot.winners[0]];
                 seat.stack += pot.chips;
+
+                result[potIndex].winners.push({
+                    seat: pot.winners[0],
+                    chips: pot.chips
+                });
             }
         });
+
+        return result;
     }
 
     resetTable(deep = false) {

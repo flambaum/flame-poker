@@ -79,7 +79,7 @@ module.exports = new class MessageCenter {
 
     notifyRoom(roomID, event, data, player) {
         let socket;
-        if (player) {
+        if (player && player.sockets.game[roomID]) {
             socket = player.sockets.game[roomID].broadcast.to(roomID);
         } else {
             socket = this.gameIO.to(roomID);
