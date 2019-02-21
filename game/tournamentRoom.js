@@ -20,7 +20,7 @@ const ROUND_STAGE = {
 class tRoom extends Room{
     constructor(id, options) {
         super(id, options);
-        this.options.startTime = Date.now() + 120000;
+        this.options.startTime = Date.now() + 60000;
 
         this.state = STATE.wait;
         this.players = {};
@@ -53,6 +53,7 @@ class tRoom extends Room{
         let result = {
             currentPlayer: this.currentPlayer,
             roundStage: this.roundStage,
+            bigBlind: this.bigBlind,
             button: this.button,
             board: this.board,
             pots: this.pots,
@@ -78,7 +79,7 @@ class tRoom extends Room{
         let result = {};
         for (const i in this.seats) {
             const seat = this.seats[i];
-            if (seat.inGame) result[i] = seat.hand;
+            result[i] = seat.inGame ? seat.hand : null;
         }
         return result;
     }
@@ -177,12 +178,12 @@ class tRoom extends Room{
 
             this.dealPublicCards(state);
 
-            messageCenter.notifyRoom(this.id, `new-street`, this.getRoomState());
+            // messageCenter.notifyRoom(this.id, `new-street`, this.getRoomState());
 
             // Если все в оллине ставим задержку и пропускаем круг торгов.
             if (this.numPlayersInGame - this.allInCount < 2) {
-
-                messageCenter.notifyRoom(this.id, 'all-in', this.getPlayersHands());
+                messageCenter.notifyRoom(this.id, `new-street`, this.getRoomState());
+                messageCenter.notifyRoom(this.id, `all-in`, this.getPlayersHands());
 
                 this.delay(3000);
                 yield;
@@ -193,6 +194,8 @@ class tRoom extends Room{
                 this.resetTable();
                 this.setCurrentPlayer(this.button);
             }
+
+            messageCenter.notifyRoom(this.id, `new-street`, this.getRoomState());
 
             console.log(`++++Pered krugom torgov state=`, state);
 
@@ -272,17 +275,23 @@ class tRoom extends Room{
                 check: false,
                 call: false,
                 bet: false,
+                raise: false,
                 allIn: true
             }
         };
 
         const act = data.actions;
         if (this.bet === seat.bet) {
+            act.fold = false;
             act.check = true;
-            act.bet = true;
-        } else if (seat.stack > this.bet - seat.bet) {
+            if (this.bet === 0) {
+                act.bet = true;
+            } else {
+                act.raise = true;
+            }
+        } else {
             act.call = true;
-            act.bet = true;
+            if (seat.stack > this.bet - seat.bet) act.raise = true;
         }
 
         seat.actions = act;
@@ -527,12 +536,42 @@ class tRoom extends Room{
 
     timeOut() {
         const seat = this.seats[this.currentPlayer];
+        let action;
         if (seat.bet < this.bet) {
             seat.inGame = false;
             this.numPlayersInGame--;
+            action = 'fold';
         } else {
             seat.isActed = true;
+            action = 'check';
         }
+
+        messageCenter.notifyRoom(this.id, `player-acted`, {
+            action: {
+                word: action,
+                bet: null
+            },
+            stack: seat.stack,
+            bet: seat.bet,
+            inGame: seat.inGame,
+            player: {
+                seat: this.currentPlayer,
+                id: seat.player.id,
+                name: seat.player.name
+            }
+        }, seat.player);
+
+        messageCenter.notifyPlayer(seat.player, this.id, `action-completed`, {
+            stack: seat.stack,
+            bet: seat.bet,
+            inGame: seat.inGame,
+            player: {
+                seat: this.currentPlayer,
+                id: seat.player.id,
+                name: seat.player.name
+            }
+        });
+
         this.roundGenerator.next();
     }
 
@@ -545,7 +584,7 @@ class tRoom extends Room{
     _action(player, data) {
         console.log(`_ACTION`, data);
 
-        if ( !(player.name in this.players)) return;
+        if ( !(player.name in this.players) ) return;
 
         const seat = this.seats[this.currentPlayer];
 
@@ -590,6 +629,11 @@ class tRoom extends Room{
             stack: seat.stack,
             bet: seat.bet,
             inGame: seat.inGame,
+            player: {
+                seat: this.currentPlayer,
+                id: seat.player.id,
+                name: seat.player.name
+            }
         });
 
         let newData = {

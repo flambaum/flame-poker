@@ -4,7 +4,6 @@ class Room {
     constructor(id, options) {
         this.options = {
             numSeats: 6,
-
         };
 
         if(options && (typeof options === 'object')) {
