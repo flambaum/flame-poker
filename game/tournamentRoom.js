@@ -247,7 +247,7 @@ class tRoom extends Room{
         while (true) {
             this.requestAction();
 
-            this.actionTimer = setTimeout(this.timeOut.bind(this), 60*1000);
+            this.actionTimer = setTimeout(this.timeOut.bind(this), 20*1000);
 
             console.log(`+++запрос ставки, таймер пошел`);
             console.log(this);
