@@ -12,6 +12,9 @@ const KEYS_ROOM = {
     2: `tournament`
 };
 
+const TIME_TO_START = 60*1000,
+      UPDATE_TIME = 5*1000;
+
 class GameServer {
     constructor() {
         this.cashRooms = {};
@@ -25,12 +28,18 @@ class GameServer {
     start(options) {
         const rooms = options.rooms;
         for (let type in rooms) {
-            for (let i = 0; i<rooms[type].num; i++) {
-                this.addRoom(type, rooms[type].options);
+            const num = rooms[type].num;
+            for (let i = 0; i < num; i++) {
+                const options = rooms[type].options;
+                if (!options) continue;
+                if ( type in TYPES_ROOM && type === `tournament` ) {
+                    options.startTime = Date.now() + TIME_TO_START;
+                }
+                this.addRoom(type, options);
             }
         }
 
-        this.interval = setInterval(this.timeControl.bind(this), 5000);
+        this.interval = setInterval(this.timeControl.bind(this), UPDATE_TIME);
 
         return this;
     }
@@ -43,13 +52,19 @@ class GameServer {
             if (room.state === 0 && room.options.startTime < Date.now()) {
                 console.log(`++++++ Tournament START +++++`);
                 room.startTournament();
+
+                const newOptions = Object.assign({}, room.options);
+                newOptions.startTime = Date.now() + TIME_TO_START;
+
+                this.addRoom(`tournament`, newOptions);
             }
         }
-
     }
 
     addRoom(type, options) {
-        const id = KEYS_ROOM[type] + String(Math.random()).slice(2);
+        if ( !(type in TYPES_ROOM) ) return;
+
+        const id = KEYS_ROOM[type] + String(Math.random()).slice(2, 8);
         this.roomsCount += 1;
         const room = new TYPES_ROOM[type](id, options);
         this[`${type}Rooms`][id] = room;

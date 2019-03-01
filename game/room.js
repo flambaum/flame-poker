@@ -7,7 +7,7 @@ class Room {
         };
 
         if(options && (typeof options === 'object')) {
-            for(const i in options) this.options[i] = options[i];
+            for (const i in options) this.options[i] = options[i];
         }
         this.id = id;
         this.seats = [];

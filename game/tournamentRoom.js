@@ -20,7 +20,8 @@ const ROUND_STAGE = {
 class tRoom extends Room{
     constructor(id, options) {
         super(id, options);
-        this.options.startTime = Date.now() + 60000;
+
+        if (!options.startTime) this.options.startTime = Date.now() + 300000;
 
         this.state = STATE.wait;
         this.players = {};
