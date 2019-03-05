@@ -6,7 +6,8 @@ const STATE = {
     wait: 0,
     run: 1,
     pause: 2,
-    finished: 3
+    finished: 3,
+    canceled: 4
 };
 
 const ROUND_STAGE = {
@@ -26,7 +27,14 @@ class tRoom extends Room{
         this.state = STATE.wait;
         this.players = {};
         this.seats = [];
+        this.leaderboard = {};
         this.seatsTaken = 0;
+        this.prizePool = 0;
+        this.level = 1;
+        this.changesToNextRound = {
+            nextLevel: false,
+            seatOut: {}
+        };
 
         this.button = 0;
         this.allInCount = 0;
@@ -86,14 +94,13 @@ class tRoom extends Room{
     }
 
     async _register(player) {
-        if (this.isFull) return;
+        if ( this.isFull || (this.state !== STATE.wait) ) return;
 
         if (player.name in this.players) return;
 
         let balance = await player.money;
-        console.log(balance, `===1`);
+
         balance = balance - this.options.buyIn;
-        console.log(balance, `===2`);
         if (balance >= 0) {
             this.players[player.name] = player;
             this.seatsTaken += 1;
@@ -107,6 +114,7 @@ class tRoom extends Room{
     }
 
     async _unregister(player) {
+        if (this.state !== STATE.wait) return;
         if (! player.name in this.players) return;
 
         this.seatsTaken -= 1;
@@ -120,9 +128,45 @@ class tRoom extends Room{
         super.notifyAll(`room-changed`, this.getRoom(true));
     }
 
+    async finish() {
+        if (this.state === STATE.finished) {
+            const prizes = this.options.prizes,
+                numOfPrizes = Math.ceil(Object.keys(this.leaderboard).length * prizes.numOfPrizes);
+
+            for (let i = 1; i <= numOfPrizes; i++) {
+                const player = this.leaderboard[i];
+                let balance = await player.money;
+                balance += this.prizePool * prizes[numOfPrizes][i];
+                player.money = balance;
+            }
+        }
+
+        if (this.state === STATE.canceled && this.seatsTaken === 1) {
+            const playerName = Object.keys(this.players)[0],
+                player = this.players[playerName];
+
+            let balance = await player.money;
+            balance += this.options.buyIn;
+            player.money = balance;
+        }
+    }
+
     startTournament() {
         if (this.state !== STATE.wait) return;
+
+        if (this.seatsTaken < 2) {
+            this.state = STATE.canceled;
+            this.finish();
+            return;
+        }
+
+        this.prizePool = this.options.buyIn * this.seatsTaken;
+
         this.state = STATE.run;
+
+        this.levelInterval = setInterval(() => {
+            this.changesToNextRound.nextLevel = true;
+        }, this.options.levelTime);
 
         for (const name in this.players) {
             const seat = {
@@ -221,11 +265,15 @@ class tRoom extends Room{
             hands: this.getPlayersHands(),
         });
 
+        this.checkChanges();
+
         this.button = (this.button + 1) % this.seatsTaken;
 
         this.seats = this.seats.filter((seat, i) => {
             if (seat.stack === 0) {
+                this.leaderboard[this.seatsTaken] = seat.player;
                 this.seatsTaken--;
+
                 //Двигаем фишку дилера назад, если перед ней кто-то выбыл.
                 if (this.button > i) this.button--;
                 return false;
@@ -233,15 +281,15 @@ class tRoom extends Room{
             return true;
         });
 
-        if (this.seats.length > 1) {
+        if (this.seatsTaken > 1) {
             setTimeout(() => {
                 this.roundGenerator = this.round();
                 this.roundGenerator.next();
             }, 5000);
         } else {
             this.seats = STATE.finished;
+            this.finish();
         }
-
     }
 
     * bettingRound() {
@@ -574,6 +622,15 @@ class tRoom extends Room{
         });
 
         this.roundGenerator.next();
+    }
+
+    checkChanges() {
+        const changes = this.changesToNextRound;
+        if (changes.nextLevel) {
+            this.level ++;
+            this.bigBlind = this.options.structure[this.level] || this.bigBlind;
+            changes.nextLevel = false;
+        }
     }
 
     delay(ms) {
