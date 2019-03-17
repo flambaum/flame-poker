@@ -213,6 +213,10 @@ class tRoom extends Room{
         this.playerBet(sb, this.bigBlind / 2);
         this.playerBet(bb, this.bigBlind);
 
+        if (this.numPlayersInGame - this.allInCount < 2) {
+            this.replenishPot();
+        }
+
         messageCenter.notifyRoom(this.id, `new-round`, this.getRoomState());
 
         this.deck = Poker.getDeck();
