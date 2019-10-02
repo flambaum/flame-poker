@@ -1,4 +1,4 @@
-<nav class="">
+<nav class="header__nav">
     <div class="container">
         <ul class="">
             <li><a href="/">Главная</a></li>
@@ -8,7 +8,7 @@
         </ul>
         <ul class="">
             <% if (user) { %>
-            <li><buton id="logout" >Выйти </buton>(<%-user.username%>)</li>
+            <li><button id="logout" >Выйти </button>[<%-user.username%>]</li>
             <% } else { %>
             <li><a href="/login">Войти</a></li>
             <% } %>

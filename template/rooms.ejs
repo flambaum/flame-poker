@@ -1,12 +1,14 @@
 <% layout('layout/page') -%>
 <% block('title', 'FlamePoker'); %>
+
+<div class="rooms"></div>
+
 <script src="/socket.io/socket.io.js"></script>
 <script>
     const ROOM_NAME = {
         cash: `Кэш столы`,
         tournament: `Турнирные столы`
     };
-    const CRA_URL = `http://localhost:3001`;
     const lobbySocket = io.connect(`/lobby`);
 
     lobbySocket.on(`info`, (data) => {
@@ -14,33 +16,35 @@
     })
 
     lobbySocket.on(`rooms`, (data)=>{
-        console.log(lobbySocket);
         const container = document.getElementsByClassName(`rooms`)[0];
         for( const name in data) {
             const h2 = document.createElement(`h3`);
             h2.textContent = ROOM_NAME[name];
             const ul = document.createElement(`ul`);
+            ul.classList.add('table-list');
             const rooms = data[name];
             for(let i=0; i<rooms.length; i++ ) {
                 const room = rooms[i];
                 const li = document.createElement(`li`);
+                li.classList.add('table');
                 li.id = room.id;
                 const a = document.createElement(`a`);
-                a.href = `${CRA_URL}/room/${room.id}`;
+                a.href = `/room/${room.id}`;
                 a.target = `_blank`;
-                a.textContent = `${room.id}    ${room.seatsTaken}/${room.options.numSeats}  `;
+                a.textContent = `id:${room.id} | players: ${room.seatsTaken}/${room.options.numSeats}`;
                 if (name === `tournament`) {
-                    a.textContent += `buy-in: ${room.options.buyIn}    `;
+                    a.textContent += ` | buy-in: ${room.options.buyIn} |
+                        start: ${String(new Date(room.options.startTime)).slice(4,24)}`;
                     li.append(a);
                     const button = document.createElement(`button`);
                     const inRoom = room.players.indexOf(lobbySocket.playerName);
                     if (~inRoom) {
-                        button.textContent = `Выйти`;
+                        button.textContent = `Отменить регистрацию`;
                         button.onclick = (e) => {
                             lobbySocket.emit(`action`, {roomID: e.target.parentNode.id, action: `unregister`});
                         }
                     } else {
-                        button.textContent = `Войти`;
+                        button.textContent = `Зарегистрироваться`;
                         button.onclick = (e) => {
                             lobbySocket.emit(`action`, {roomID: e.target.parentNode.id, action: `register`});
                         }
@@ -50,6 +54,7 @@
                 ul.append(li);
             }
 
+            container.innerHTML = ``;
             container.append(h2, ul);
         }
 
@@ -60,22 +65,22 @@
         const li = document.getElementById(room.id);
 
         const a = document.createElement(`a`);
-        a.textContent = `${room.id}    ${room.seatsTaken}/${room.options.numSeats}  `;
-        a.href = `${CRA_URL}/room/${room.id}`;
+        a.textContent = `id:${room.id} | players: ${room.seatsTaken}/${room.options.numSeats}`;
+        a.href = `/room/${room.id}`;
         a.target = `_blank`;
-        if (room.id[0] === `2`) a.textContent += `buy-in: ${room.options.buyIn}    `;
-
+        if (room.id[0] === `2`) a.textContent += ` | buy-in: ${room.options.buyIn} |
+            start: ${String(new Date(room.options.startTime)).slice(4,24)}`;
         const button = document.createElement(`button`);
         const inRoom = room.players.indexOf(lobbySocket.playerName);
         if (~inRoom) {
-            button.textContent = `Выйти`;
+            button.textContent = `Отменить регистрацию`;
             button.onclick = (e)=>{
-                lobbySocket.emit(`action`, {room:e.target.parentNode.id, action: `unregister`});
+                lobbySocket.emit(`action`, {roomID: e.target.parentNode.id, action: `unregister`});
             }
         } else {
-            button.textContent = `Войти`;
+            button.textContent = `Зарегистрироваться`;
             button.onclick = (e) => {
-                lobbySocket.emit(`action`, {room: e.target.parentNode.id, action: `register`});
+                lobbySocket.emit(`action`, {roomID:  e.target.parentNode.id, action: `register`});
             }
         }
         li.innerHTML = ``;
@@ -87,4 +92,3 @@
 
 
 </script>
-<div class="rooms"></div>

@@ -225,15 +225,28 @@ class Poker {
     }
 }
 
-const a = Poker.getDeck().slice(0, 7);
 
-//let a = [`3h`,`3s`,`Ah`,`3c`,`2h`,`3d`,`4h`];
-//let a = [`Th`,`3h`,`2h`,`3c`,`Ah`,`Ac`,`3h`];
-console.log(a);
-const res = Poker.findBestCombination(a);
-for (c in COMBS) if (COMBS[c] === res.comb) console.log(c);
+// let a = [ 'As', 'Ad', 'Kd', 'Qh', 'Qs', '4c', '4s' ];
+// let b = [ 'Ac', 'Ad', 'Kd', 'Qh', 'Qs', '7c', '4s' ];
+//
+// const resA = Poker.findBestCombination(a);
+//
+// const resB = Poker.findBestCombination(b);
+// for (c in COMBS) if (COMBS[c] === resA.comb) console.log(c);
+//
+// console.log(`cardCosts: `, resA.cardCosts ? resA.cardCosts.map(c=>RANK[c]): null);
+//
+// console.log(`kickers: `, resA.kickers ? resA.kickers.map(c=>RANK[c]): null);
+//
+//
+//
+// for (c in COMBS) if (COMBS[c] === resB.comb) console.log(c);
+//
+// console.log(`cardCosts: `, resB.cardCosts ? resB.cardCosts.map(c=>RANK[c]): null);
+//
+// console.log(`kickers: `, resB.kickers ? resB.kickers.map(c=>RANK[c]): null);
+//
+// console.log(Poker.compareCombinations(resA,resB));
 
-console.log(`cardCosts: `, res.cardCosts ? res.cardCosts.map(c=>RANK[c]): null);
 
-console.log(`kickers: `, res.kickers ? res.kickers.map(c=>RANK[c]): null);
 module.exports = Poker;

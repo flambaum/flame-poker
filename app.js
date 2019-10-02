@@ -12,6 +12,8 @@ const authRoute = require(`./routes/auth`);
 const gameRoute = require(`./routes/game`);
 
 
+global.__approot = __dirname;
+
 const app = express();
 
 app.engine(`ejs`, require(`ejs-locals`));
@@ -19,7 +21,7 @@ app.set('views', path.join(__dirname, 'template'));
 app.set('view engine', 'ejs');
 
 app.use(morgan('dev'));
-app.use(favicon(path.join(__dirname, 'public', 'favicon.png')));
+app.use(favicon(path.join(__dirname, 'public/img', 'favicon.png')));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: true}));

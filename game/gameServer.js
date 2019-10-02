@@ -1,4 +1,5 @@
 const Player = require(`./player`);
+const MessageCenter = require(`./messageCenter`);
 
 const TYPES_ROOM = {
     cash: require(`./cashRoom`),
@@ -12,7 +13,7 @@ const KEYS_ROOM = {
     2: `tournament`
 };
 
-const TIME_TO_START = 60*1000,
+const TIME_TO_START = 300*1000,
       UPDATE_TIME = 5*1000;
 
 class GameServer {
@@ -33,7 +34,7 @@ class GameServer {
                 const options = rooms[type].options;
                 if (!options) continue;
                 if ( type in TYPES_ROOM && type === `tournament` ) {
-                    options.startTime = Date.now() + TIME_TO_START;
+                    options.startTime = Date.now() + 60000;
                 }
                 this.addRoom(type, options);
             }
@@ -45,11 +46,12 @@ class GameServer {
     }
 
     timeControl() {
+        const TOURNAMENT_ROOM_STATE = TYPES_ROOM.tournament.STATE;
 
         for (const roomId in this.tournamentRooms) {
             const room = this.tournamentRooms[roomId];
             console.log(room.options.startTime, Date.now());
-            if (room.state === 0 && room.options.startTime < Date.now()) {
+            if (room.state === TOURNAMENT_ROOM_STATE.wait && room.options.startTime < Date.now()) {
                 console.log(`++++++ Tournament START +++++`);
                 room.startTournament();
 
@@ -58,7 +60,14 @@ class GameServer {
 
                 this.addRoom(`tournament`, newOptions);
             }
+
+            if (room.state === TOURNAMENT_ROOM_STATE.canceled ||
+                room.state === TOURNAMENT_ROOM_STATE.finished) {
+                delete this.tournamentRooms[roomId];
+            }
         }
+
+        MessageCenter.notifyAll('rooms', this.getRooms());
     }
 
     addRoom(type, options) {

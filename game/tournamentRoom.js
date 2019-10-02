@@ -39,12 +39,14 @@ class tRoom extends Room{
         this.button = 0;
         this.allInCount = 0;
         this.needNewPot = false;
+        this.finishBetting = false;
         this.roundStage = null;
         this.numPlayersInGame = 0;
         this.board = [];
         this.pots = [];
         this.pot = 0;
         this.bet = 0;
+        this.raise = 0;
         this.currentPlayer = null;
     }
 
@@ -178,7 +180,8 @@ class tRoom extends Room{
                 seatOut: false,
                 hand: [],
                 bet: null,
-                totalBet: null
+                totalBet: null,
+                actions: null,
             };
             this.seats.push(seat);
         }
@@ -211,11 +214,23 @@ class tRoom extends Room{
         }
 
         this.playerBet(sb, this.bigBlind / 2);
-        this.playerBet(bb, this.bigBlind);
-
-        if (this.numPlayersInGame - this.allInCount < 2) {
+        if (sb.allIn) sb.isActed = true;
+        if (this.numPlayersInGame === 2 && sb.allIn) {
+            this.playerBet(bb, sb.bet);
             this.replenishPot();
+            this.finishBetting = true;
+        } else this.playerBet(bb, this.bigBlind);
+        if (bb.allIn) {
+            bb.isActed = true;
+            if (sb.bet >= bb.bet) {
+                this.replenishPot();
+                this.finishBetting = true;
+            }
         }
+
+
+        //!! Добавить проверку авто-оллина малого блайнда при игре 2х игроков.
+
 
         messageCenter.notifyRoom(this.id, `new-round`, this.getRoomState());
 
@@ -227,10 +242,10 @@ class tRoom extends Room{
 
             this.dealPublicCards(state);
 
-            // messageCenter.notifyRoom(this.id, `new-street`, this.getRoomState());
-
             // Если все в оллине ставим задержку и пропускаем круг торгов.
-            if (this.numPlayersInGame - this.allInCount < 2) {
+            if ( (this.numPlayersInGame - this.allInCount < 2 && state !== ROUND_STAGE.preflop) ||
+            this.numPlayersInGame - this.allInCount === 0 ||
+            this.finishBetting) {
                 messageCenter.notifyRoom(this.id, `new-street`, this.getRoomState());
                 messageCenter.notifyRoom(this.id, `all-in`, this.getPlayersHands());
 
@@ -259,14 +274,14 @@ class tRoom extends Room{
             if (this.roundStage === ROUND_STAGE.earlyWin) {
                 break;
             }
-
         }
 
         const winnersInfo = this.rewardWinner();
 
+        const showdownHands = this.roundStage !== ROUND_STAGE.earlyWin ? this.getPlayersHands() : {};
         messageCenter.notifyRoom(this.id, 'round-end', {
             winners: winnersInfo,
-            hands: this.getPlayersHands(),
+            hands: showdownHands,
         });
 
         this.checkChanges();
@@ -291,7 +306,8 @@ class tRoom extends Room{
                 this.roundGenerator.next();
             }, 5000);
         } else {
-            this.seats = STATE.finished;
+            this.leaderboard[1] = this.seats[0].player;
+            this.state = STATE.finished;
             this.finish();
         }
     }
@@ -319,10 +335,12 @@ class tRoom extends Room{
     requestAction() {
         const seat = this.seats[this.currentPlayer];
         const data = {
+            seatNum: this.currentPlayer,
             stack: seat.stack,
             bet: seat.bet,
             pots: this.pots,
             tableBet: this.bet,
+            tableRaise: this.raise,
             actions: {
                 fold: true,
                 check: false,
@@ -351,34 +369,6 @@ class tRoom extends Room{
 
         messageCenter.notifyPlayer(seat.player, this.id, `expected-action`, data);
         messageCenter.notifyRoom(this.id, `waiting-player-move`, {seat: this.currentPlayer}, seat.player);
-    }
-
-    findingWinner(players) {
-        const candidates = [];
-        players.forEach((player) => {
-            const seat = this.seats[player];
-            if (seat.inGame) {
-                const cards = seat.hand.concat(this.board);
-                const comb = Poker.findBestCombination(cards);
-                candidates.push({players:[player], comb});
-            }
-        });
-
-        candidates.sort((player1, player2) => {
-            return Poker.compareCombinations(player2.comb, player1.comb);
-        });
-
-        for (let i = 1, index = 0; i < candidates.length; i++) {
-            const comb1 = candidates[index],
-                comb2 = candidates[index+1];
-            if (Poker.compareCombinations(comb1.comb, comb2.comb) === 0) {
-                comb1.players.concat(comb2.players);
-                candidates.splice(index+1, 1);
-            } else {
-                index++;
-            }
-        }
-    return candidates[0];
     }
 
     replenishPot() {
@@ -426,6 +416,14 @@ class tRoom extends Room{
                 seat.bet -= chips;
             }
         });
+
+        if (pot.chips === 0) this.pots.pop();
+
+        if (Object.keys(pot.plrs).length === 1) {
+            const seatNum = Object.keys(pot.plrs)[0];
+            this.seats[seatNum].stack += pot.chips;
+            this.pots.pop();
+        }
     }
 
     rewardWinner() {
@@ -446,7 +444,13 @@ class tRoom extends Room{
                 pot.winners = players;
                 pot.comb = null;
             } else {
+                console.log('==== rewWin pl',players);
+
+
                 const result = this.findingWinner(players);
+                console.log('==== rewWin res',result);
+
+
                 pot.winners = result.players;
                 pot.comb = result.comb;
             }
@@ -455,7 +459,7 @@ class tRoom extends Room{
             if (winnersCount > 1) {
                 const chips = Math.floor(pot.chips / winnersCount);
                 pot.winners.forEach((i) => {
-                    this.seats[i].chips += chips;
+                    this.seats[i].stack += chips;
                     result[potIndex].winners.push({
                         seat: i,
                         chips: chips
@@ -484,11 +488,45 @@ class tRoom extends Room{
         return result;
     }
 
+    findingWinner(players) {
+        const candidates = [];
+        players.forEach((player) => {
+            const seat = this.seats[player];
+            if (seat.inGame) {
+                const cards = seat.hand.concat(this.board);
+                const comb = Poker.findBestCombination(cards);
+                candidates.push({players:[player], comb});
+            }
+        });
+
+        candidates.sort((player1, player2) => {
+            console.log('sort', Poker.compareCombinations(player2.comb, player1.comb));
+            return Poker.compareCombinations(player2.comb, player1.comb);
+        });
+
+        console.log('==== candidates ',candidates);
+
+        for (let i = 1, index = 0; i < candidates.length; i++) {
+            const comb1 = candidates[index],
+                comb2 = candidates[index+1];
+            if (Poker.compareCombinations(comb1.comb, comb2.comb) === 0) {
+                comb1.players = comb1.players.concat(comb2.players);
+                candidates.splice(index+1, 1);
+            } else {
+                index++;
+            }
+        }
+
+        console.log('==== candidates concat ',candidates);
+        return candidates[0];
+    }
+
     resetTable(deep = false) {
         if (deep) {
             this.roundStage = 0;
             this.numPlayersInGame = 0;
             this.allInCount = 0;
+            this.finishBetting = false;
             this.pot = 0;
             this.pots = [ {
                 plrs:{},
@@ -503,6 +541,7 @@ class tRoom extends Room{
         }
 
         this.bet = 0;
+        this.raise = 0;
         this.needNewPot = false;
 
         this.seats.forEach((seat) => {
@@ -515,6 +554,7 @@ class tRoom extends Room{
             }
             seat.isActed = false;
             seat.bet = 0;
+            seat.actions = null;
         })
     }
 
@@ -540,24 +580,6 @@ class tRoom extends Room{
             }
         }
 
-    }
-
-    playerBet(seat, chips) {
-        if (chips <= 0) return;
-        if (chips >= seat.stack) {
-            chips = seat.stack;
-            seat.allIn = true;
-            this.allInCount++;
-            this.needNewPot = true;
-        }
-
-        seat.stack -= chips;
-        seat.totalBet += chips;
-        seat.bet += chips;
-        if (this.bet < seat.bet) {
-            this.bet = seat.bet;
-        }
-        this.pot += chips;
     }
 
     dealCards() {
@@ -643,6 +665,25 @@ class tRoom extends Room{
         }, ms);
     }
 
+    playerBet(seat, chips) {
+        if (chips <= 0) return false;
+        if (chips >= seat.stack) {
+            chips = seat.stack;
+            seat.allIn = true;
+            this.allInCount++;
+            this.needNewPot = true;
+        }
+
+        seat.stack -= chips;
+        seat.totalBet += chips;
+        seat.bet += chips;
+        if (this.bet < seat.bet) {
+            this.raise = seat.bet - this.bet;
+            this.bet = seat.bet > this.bigBlind ? seat.bet : this.bigBlind;
+        }
+        this.pot += chips;
+    }
+
     _action(player, data) {
         console.log(`_ACTION`, data);
 
@@ -656,6 +697,9 @@ class tRoom extends Room{
         }
 
         if (typeof data !== `object`) return;
+        if ( !data.word in seat.actions ) return;
+
+        const actionBet = Number(data.bet);
 
         switch (data.word) {
             case `fold`:
@@ -671,11 +715,15 @@ class tRoom extends Room{
                 break;
 
             case `bet`:
-                const bet = Number(data.bet);
-                if (bet < this.bet - seat.bet && bet < seat.stack) return;
+                if (actionBet < this.bigBlind) return;
 
-                this.playerBet(seat, bet);
+                this.playerBet(seat, actionBet);
+                break;
 
+            case `raise`:
+                if (seat.bet + actionBet < this.bet + this.raise) return;
+
+                this.playerBet(seat, actionBet);
                 break;
 
             default:
@@ -683,7 +731,6 @@ class tRoom extends Room{
                 return;
         }
 
-        // Добавить обработку ошибок и неверных действий до этого момента.
         clearTimeout(this.actionTimer);
         seat.isActed = true;
 
@@ -733,5 +780,7 @@ class tRoom extends Room{
     }
 
 }
+
+tRoom.STATE = STATE;
 
 module.exports = tRoom;
