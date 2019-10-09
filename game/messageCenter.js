@@ -14,15 +14,19 @@ module.exports = new class MessageCenter {
         if (this.lobbyIO) return;
 
         this.lobbyIO = io.of(`/lobby`)
-            .on(`connection`, (socket) => {
+            .on(`connection`, async (socket) => {
                 const id = socket.userId,
                     name = socket.username;
                 const player = gameServer.newPlayer(id, name);
                 if (player.sockets.lobby) {
                     player.sockets.lobby.disconnect();
-                    player.sockets.lobby = socket;
                 }
-                socket.emit(`info`, {name: socket.username});
+                player.sockets.lobby = socket;
+
+                socket.emit(`info`, {
+                    name: socket.username,
+                    balance: await player.money,
+                });
 
                 socket.emit(`rooms`, gameServer.getRooms());
 
@@ -91,7 +95,7 @@ module.exports = new class MessageCenter {
     }
 
     notifyPlayer(player, roomID, event, data) {
-        const socket = player.sockets.game[roomID];
+        const socket = roomID ? player.sockets.game[roomID] : player.sockets.lobby;
         if (socket) {
             socket.emit(event, data);
         }

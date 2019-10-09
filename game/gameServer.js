@@ -13,6 +13,8 @@ const KEYS_ROOM = {
     2: `tournament`
 };
 
+const TOURNAMENT_ROOM_STATE = TYPES_ROOM.tournament.STATE;
+
 const TIME_TO_START = 300*1000,
       UPDATE_TIME = 5*1000;
 
@@ -46,12 +48,13 @@ class GameServer {
     }
 
     timeControl() {
-        const TOURNAMENT_ROOM_STATE = TYPES_ROOM.tournament.STATE;
-
+        let isRoomsChanged = false;
         for (const roomId in this.tournamentRooms) {
             const room = this.tournamentRooms[roomId];
-            console.log(room.options.startTime, Date.now());
+
             if (room.state === TOURNAMENT_ROOM_STATE.wait && room.options.startTime < Date.now()) {
+                isRoomsChanged = true;
+
                 console.log(`++++++ Tournament START +++++`);
                 room.startTournament();
 
@@ -63,11 +66,11 @@ class GameServer {
 
             if (room.state === TOURNAMENT_ROOM_STATE.canceled ||
                 room.state === TOURNAMENT_ROOM_STATE.finished) {
+                isRoomsChanged = true;
                 delete this.tournamentRooms[roomId];
             }
         }
-
-        MessageCenter.notifyAll('rooms', this.getRooms());
+        if (isRoomsChanged) MessageCenter.notifyAll('rooms', this.getRooms());
     }
 
     addRoom(type, options) {
@@ -130,9 +133,6 @@ class GameServer {
         }
     }
 
-    notify() {
-
-    }
 }
 
 module.exports = new GameServer;

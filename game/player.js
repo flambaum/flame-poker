@@ -1,4 +1,5 @@
 const UserMoney = require(`../models/userMoney`);
+const messageCenter = require(`./messageCenter`);
 
 class Player {
     constructor(id, name) {
@@ -27,6 +28,18 @@ class Player {
             userMoney.money = m;
             userMoney.save();
         });
+    }
+
+    async changeBalance(value) {
+        value = Number(value);
+        const balance = await this.money;
+        const newBalance = balance + value;
+        if (newBalance >= 0) {
+            this.money = newBalance;
+            messageCenter.notifyPlayer(this, null, 'balance', {value: newBalance});
+            return true;
+        }
+        return false;
     }
 }
 

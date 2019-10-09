@@ -100,19 +100,14 @@ class tRoom extends Room{
 
         if (player.name in this.players) return;
 
-        let balance = await player.money;
-
-        balance = balance - this.options.buyIn;
-        if (balance >= 0) {
+        const balanceChanged = player.changeBalance( - this.options.buyIn );
+        if (balanceChanged) {
             this.players[player.name] = player;
             this.seatsTaken += 1;
             if (this.seatsTaken === this.options.numSeats) this.isFull = true;
 
-            player.money = balance;
-
             super.notifyAll(`room-changed`, this.getRoom(true));
         }
-
     }
 
     async _unregister(player) {
@@ -123,9 +118,7 @@ class tRoom extends Room{
         this.isFull = false;
         delete this.players[player.name];
 
-        let balans = await player.money;
-        balans += this.options.buyIn;
-        player.money = balans;
+        player.changeBalance( this.options.buyIn );
 
         super.notifyAll(`room-changed`, this.getRoom(true));
     }
@@ -137,19 +130,14 @@ class tRoom extends Room{
 
             for (let i = 1; i <= numOfPrizes; i++) {
                 const player = this.leaderboard[i];
-                let balance = await player.money;
-                balance += this.prizePool * prizes[numOfPrizes][i];
-                player.money = balance;
+                player.changeBalance( this.prizePool * prizes[numOfPrizes][i] )
             }
         }
 
         if (this.state === STATE.canceled && this.seatsTaken === 1) {
-            const playerName = Object.keys(this.players)[0],
-                player = this.players[playerName];
-
-            let balance = await player.money;
-            balance += this.options.buyIn;
-            player.money = balance;
+            const playerName = Object.keys(this.players)[0];
+            const player = this.players[playerName];
+            player.changeBalance( this.options.buyIn );
         }
     }
 
@@ -228,10 +216,6 @@ class tRoom extends Room{
             }
         }
 
-
-        //!! Добавить проверку авто-оллина малого блайнда при игре 2х игроков.
-
-
         messageCenter.notifyRoom(this.id, `new-round`, this.getRoomState());
 
         this.deck = Poker.getDeck();
@@ -264,8 +248,6 @@ class tRoom extends Room{
             console.log(`++++Pered krugom torgov state=`, state);
 
             yield* this.bettingRound();
-
-            // вернуть ставку если никто не ответил!!
 
             this.replenishPot();
 
