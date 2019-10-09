@@ -8,7 +8,7 @@ body {
 
 .header__nav .container {
     background-color: #282c34;
-    min-height: 5vh;
+    min-height: 8vh;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -24,11 +24,21 @@ body {
 .header__nav li {
     list-style: none;
     margin: 0 20px;
+    height: 22px;
 }
 
 .header__nav a {
     color: white;
     text-decoration: none;
+}
+
+.header__nav .cashier {
+    display: none;
+    color: gold;
+}
+
+.header__nav .cashier p {
+    margin: 0;
 }
 
 #logout {
