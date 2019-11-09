@@ -5,14 +5,14 @@ exports.singUp = async (req, res, next) => {
 	const {username, password} = req.body;
 	let user;
 	try {
-        user = await User.register(username, password);
-        await UserMoney.create({ userId: user._id });
-    } catch (err) {
-        return next({
-            status: 400,
-            message: err.message
-        });
-    }
+		user = await User.register(username, password);
+		await UserMoney.create({ userId: user._id });
+	} catch (err) {
+		return next({
+			status: 400,
+			message: err.message
+		});
+	}
 
 	req.session.userId = user._id;
 	res.redirect(`/`);
